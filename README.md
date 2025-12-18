@@ -99,6 +99,30 @@ It is responsible for:
 - Delivering private messages
 - Detecting and handling disconnections
 
+```
+START SERVER
+   |
+   |-- listen on a port
+   |
+CLIENT CONNECTS
+   |
+   |-- start a new thread for this client
+   |
+CLIENT SENDS LOGIN
+   |
+   |-- register username
+   |
+CLIENT SENDS MESSAGE
+   |
+   |-- check message type
+   |-- broadcast / route / store
+   |
+CLIENT DISCONNECTS
+   |
+   |-- remove client
+   |-- notify others
+```
+
 ### Functions
 
 #### `start_server(host, port)`
