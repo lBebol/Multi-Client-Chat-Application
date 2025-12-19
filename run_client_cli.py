@@ -1,118 +1,153 @@
-# abouzeid
-import socket
-import threading
-import json
+import sys
+import client_net
 
-class ClientNet:
-    def __init__(self, on_message=None, on_disconnect=None):
-        """
-        on_message(msg_dict): called when a message is received
-        on_disconnect(): called when connection is lost
-        """
-        self.sock = None
-        self.receiver_thread = None
-        self.running = False
+from common import (
+    MSG_SYSTEM,
+    MSG_GROUP,
+    MSG_PRIVATE,
+    MSG_ERROR,
+    MSG_HISTORY_RESPONSE,
+    MSG_LOGIN_OK,
+)
 
-        self.on_message = on_message
-        self.on_disconnect = on_disconnect
+def _format_history_item(item):
+    """
+    Tries to format history rows safely even if storage returns dicts or tuples.
+    Expected dict keys (recommended): ts, sender, scope, target, text
+    """
+    # Dict format
+    if isinstance(item, dict):
+        ts = item.get("ts", "")
+        sender = item.get("sender", item.get("from", ""))
+        scope = item.get("scope", "")
+        target = item.get("target", "")
+        text = item.get("text", "")
+        if scope == "pm":
+            return f"[PM] {sender} -> {target}: {text}"
+        return f"{sender}: {text}"
 
-    # -------------------- Connection --------------------
-    def connect(self, server_ip, port, username):
-        """
-        Connect to server and perform login
-        """
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((server_ip, port))
+    # Tuple/list format (fallback)
+    if isinstance(item, (tuple, list)):
+        # Try common patterns: (ts, sender, scope, target, text)
+        if len(item) >= 5:
+            _, sender, scope, target, text = item[:5]
+            if scope == "pm":
+                return f"[PM] {sender} -> {target}: {text}"
+            return f"{sender}: {text}"
+        # If unknown shape, just print it
+        return str(item)
 
-        # Send login message
-        login_msg = {
-            "type": "login",
-            "username": username
-        }
-        self.send_json(login_msg)
+    return str(item)
 
-        # Start receiver thread
-        self.running = True
-        self.receiver_thread = threading.Thread(
-            target=self.receive_loop,
-            daemon=True
-        )
-        self.receiver_thread.start()
 
-    # -------------------- Receiving --------------------
-    def receive_loop(self):
-        """
-        Background thread that listens for messages
-        """
-        try:
-            while self.running:
-                msg = self.recv_json()
-                if msg is None:
-                    break
+def on_status(status, details=""):
+    if status == "connected":
+        print(f"\n[Connected] {details}\n")
+    elif status == "disconnected":
+        print(f"\n[Disconnected] {details}\n")
+    elif status == "error":
+        print(f"\n[Error] {details}\n")
+    else:
+        print(f"\n[{status}] {details}\n")
 
-                if self.on_message:
-                    self.on_message(msg)
 
-        except Exception as e:
-            print("Receive error:", e)
+def on_message(msg):
+    msg_type = msg.get("type")
 
-        finally:
-            self.running = False
-            if self.on_disconnect:
-                self.on_disconnect()
+    if msg_type == MSG_SYSTEM:
+        print(f"\n* {msg.get('text', '')} *")
+        return
 
-    # -------------------- Sending --------------------
-    def send_group_message(self, text):
-        """
-        Send a group chat message
-        """
-        msg = {
-            "type": "group_message",
-            "text": text
-        }
-        self.send_json(msg)
+    if msg_type == MSG_GROUP:
+        sender = msg.get("from", "")
+        text = msg.get("text", "")
+        print(f"\n{sender}: {text}")
+        return
 
-    def send_private_message(self, target, text):
-        """
-        Send a private message to a user
-        """
-        msg = {
-            "type": "private_message",
-            "target": target,
-            "text": text
-        }
-        self.send_json(msg)
+    if msg_type == MSG_PRIVATE:
+        sender = msg.get("from", "")
+        target = msg.get("target", "")
+        text = msg.get("text", "")
+        print(f"\n[PM] {sender} -> {target}: {text}")
+        return
 
-    # -------------------- Disconnect --------------------
-    def disconnect(self):
-        """
-        Close connection gracefully
-        """
-        self.running = False
-        try:
-            if self.sock:
-                self.sock.close()
-        except:
-            pass
+    if msg_type == MSG_HISTORY_RESPONSE:
+        scope = msg.get("scope")
+        messages = msg.get("messages", [])
 
-    # -------------------- JSON Helpers --------------------
-    def send_json(self, data):
-        """
-        Send JSON object with newline delimiter
-        """
-        message = json.dumps(data).encode("utf-8") + b"\n"
-        self.sock.sendall(message)
+        if scope == "group":
+            print("\n--- Group History ---")
+            for item in messages:
+                print(_format_history_item(item))
+            print("--- End Group History ---\n")
+            return
 
-    def recv_json(self):
-        """
-        Receive a single JSON message
-        """
-        buffer = b""
-        while b"\n" not in buffer:
-            chunk = self.sock.recv(4096)
-            if not chunk:
-                return None
-            buffer += chunk
+        if scope == "pm":
+            other = msg.get("with", "unknown")
+            print(f"\n--- PM History with {other} ---")
+            for item in messages:
+                print(_format_history_item(item))
+            print(f"--- End PM History with {other} ---\n")
+            return
 
-        line, _, rest = buffer.partition(b"\n")
-        return json.loads(line.decode("utf-8"))
+        print(f"\n[History] {msg}")
+        return
+
+    if msg_type == MSG_LOGIN_OK:
+        print(f"\n[Logged in as {msg.get('username', '')}]")
+        return
+
+    if msg_type == MSG_ERROR:
+        print(f"\n[Server Error] {msg.get('message', '')}")
+        return
+
+    print(f"\n[Unknown message] {msg}")
+
+
+def main():
+    print("=== Multi-Client Chat (CLI) ===")
+    server_ip = input("Server IP (e.g. 127.0.0.1): ").strip()
+    port = input("Port (e.g. 12345): ").strip()
+    username = input("Username: ").strip()
+
+    ok = client_net.connect(
+        server_ip=server_ip,
+        port=int(port),
+        username=username,
+        on_message=on_message,
+        on_status=on_status
+    )
+
+    if not ok:
+        print("Failed to connect. Exiting.")
+        return
+
+    print("Type a group message and press Enter.")
+    print("Private message format: /pm <username> <message>")
+    print("Exit: Ctrl+C\n")
+
+    try:
+        while True:
+            text = input()
+            if not text:
+                continue
+
+            if text.startswith("/pm "):
+                parts = text.split(" ", 2)
+                if len(parts) < 3:
+                    print("Usage: /pm <username> <message>")
+                    continue
+                target = parts[1].strip()
+                msg_text = parts[2].strip()
+                client_net.send_private_message(target, msg_text)
+            else:
+                client_net.send_group_message(text)
+
+    except KeyboardInterrupt:
+        print("\nExiting...")
+        client_net.disconnect()
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

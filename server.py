@@ -1,5 +1,6 @@
 import socket
 import threading
+from storage import load_pm_partners
 
 from common import (
     send_json,
@@ -153,6 +154,7 @@ def broadcast_system(text):
 # History handling
 # =========================
 
+
 def send_history(sock, username):
     group_history = load_group_history(limit=50)
 
@@ -162,17 +164,18 @@ def send_history(sock, username):
         "messages": group_history
     })
 
-    with lock:
-        for other in usernames:
-            if other != username:
-                pm_history = load_private_history(username, other, limit=50)
-                if pm_history:
-                    send_json(sock, {
-                        "type": MSG_HISTORY_RESPONSE,
-                        "scope": "pm",
-                        "with": other,
-                        "messages": pm_history
-                    })
+    pm_partners = load_pm_partners(username)
+
+    for other in pm_partners:
+        pm_history = load_private_history(username, other, limit=50)
+        if pm_history:
+            send_json(sock, {
+                "type": MSG_HISTORY_RESPONSE,
+                "scope": "pm",
+                "with": other,
+                "messages": pm_history
+            })
+
 
 
 # =========================
