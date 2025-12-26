@@ -1,10 +1,9 @@
-# run_client_gui.py
 import tkinter as tk
-from client_gui import ChatGUI
+from client_gui import ChatGUIAdvanced
 
 def main():
     root = tk.Tk()
-    ChatGUI(root)
+    ChatGUIAdvanced(root)
     root.mainloop()
 
 if __name__ == "__main__":
