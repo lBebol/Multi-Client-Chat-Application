@@ -19,16 +19,7 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts INTEGER NOT NULL,
-            sender TEXT NOT NULL,
-            scope TEXT NOT NULL,   -- 'group' or 'pm'
-            target TEXT,
-            text TEXT NOT NULL
-        )
-    """)
+    cur.execute()
 
     conn.commit()
     conn.close()
@@ -45,10 +36,7 @@ def save_message(ts, sender, scope, target, text):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    cur.execute("""
-        INSERT INTO messages (ts, sender, scope, target, text)
-        VALUES (?, ?, ?, ?, ?)
-    """, (ts, sender, scope, target, text))
+    cur.execute((ts, sender, scope, target, text))
 
     conn.commit()
     conn.close()
@@ -95,17 +83,7 @@ def load_private_history(user1, user2, limit=50):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT ts, sender, target, text
-        FROM messages
-        WHERE scope = 'pm'
-          AND (
-                (sender = ? AND target = ?)
-             OR (sender = ? AND target = ?)
-          )
-        ORDER BY ts ASC
-        LIMIT ?
-    """, (user1, user2, user2, user1, limit))
+    cur.execute((user1, user2, user2, user1, limit))
 
     rows = cur.fetchall()
     conn.close()
@@ -128,16 +106,7 @@ def load_pm_partners(username):
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT DISTINCT
-            CASE
-                WHEN sender = ? THEN target
-                ELSE sender
-            END
-        FROM messages
-        WHERE scope = 'pm'
-          AND (sender = ? OR target = ?)
-    """, (username, username, username))
+    cur.execute((username, username, username))
 
     rows = cur.fetchall()
     conn.close()

@@ -48,7 +48,6 @@ def recv_json(sock):
             line, _, remainder = buffer.partition("\n")
             return json.loads(line)
 
-
 # =========================
 # Utility helpers
 # =========================
