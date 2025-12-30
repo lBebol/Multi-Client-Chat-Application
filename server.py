@@ -223,7 +223,7 @@ def remove_client(client_socket):
             usernames.pop(username, None)
 
     if username:
-        broadcast_system(f"{username} left the chat")
+        broadcast_system(f"{username} is no longer with us.. :c)")
         broadcast_userlist()
 
 

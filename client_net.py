@@ -10,7 +10,6 @@ from common import (
     MSG_ERROR,
     MSG_GROUP,
     MSG_PRIVATE,
-    MSG_HISTORY_RESPONSE,
 )
 
 # =========================

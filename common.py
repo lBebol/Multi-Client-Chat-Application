@@ -3,9 +3,9 @@ import time
 
 _socket_buffers = {}
 
-# =========================
-# Message type constants
-# =========================
+# ============
+# constants
+# ============
 
 MSG_LOGIN = "login"
 MSG_LOGIN_OK = "login_ok"
