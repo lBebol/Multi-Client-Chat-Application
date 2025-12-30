@@ -1,6 +1,8 @@
 import json
 import time
 
+_socket_buffers = {}
+
 # =========================
 # Message type constants
 # =========================
@@ -16,6 +18,7 @@ MSG_SYSTEM = "system"
 MSG_HISTORY_REQUEST = "history_request"
 MSG_HISTORY_RESPONSE = "history_response"
 
+MSG_USERLIST = "userlist"
 
 # =========================
 # JSON socket helpers
@@ -31,22 +34,21 @@ def send_json(sock, data):
 
 
 def recv_json(sock):
-    """
-    Receives a single JSON message from a socket.
-    Blocks until a newline character is encountered.
-    Returns the decoded Python dictionary.
-    """
-    buffer = ""
+    buf = _socket_buffers.get(sock, "")
+
     while True:
-        chunk = sock.recv(4096).decode("utf-8")
+        if "\n" in buf:
+            line, _, rest = buf.partition("\n")
+            _socket_buffers[sock] = rest
+            return json.loads(line)
+
+        chunk = sock.recv(4096)
         if not chunk:
-            # Socket closed
+            _socket_buffers.pop(sock, None)
             return None
 
-        buffer += chunk
-        if "\n" in buffer:
-            line, _, remainder = buffer.partition("\n")
-            return json.loads(line)
+        buf += chunk.decode("utf-8")
+        _socket_buffers[sock] = buf
 
 # =========================
 # Utility helpers

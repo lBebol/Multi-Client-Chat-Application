@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import client_net
-from common import MSG_SYSTEM, MSG_GROUP, MSG_PRIVATE, MSG_HISTORY_RESPONSE
+from common import MSG_SYSTEM, MSG_GROUP, MSG_PRIVATE, MSG_HISTORY_RESPONSE, MSG_USERLIST
 
 class ChatGUIAdvanced:
     def __init__(self, root):
@@ -160,6 +160,13 @@ class ChatGUIAdvanced:
 
     def _handle_message(self, msg):
         t = msg.get("type")
+
+        if t == MSG_USERLIST:
+            users = msg.get("users", [])
+            self.online_users = set(users)
+            self._update_user_list()
+            return
+
 
         if t == MSG_SYSTEM:
             text = msg.get("text", "")

@@ -13,6 +13,7 @@ from common import (
     MSG_SYSTEM,
     MSG_ERROR,
     MSG_HISTORY_RESPONSE,
+    MSG_USERLIST,
 )
 
 from storage import (
@@ -65,10 +66,13 @@ def handle_client(client_socket):
             "username": username
         })
 
-        # ---- SEND HISTORY ----
+        send_userlist(client_socket)
+
         send_history(client_socket, username)
 
         broadcast_system(f"{username} joined the chat")
+
+        broadcast_userlist()
 
         # ---- MAIN LOOP ----
         while True:
@@ -89,6 +93,7 @@ def handle_client(client_socket):
 
     finally:
         remove_client(client_socket)
+
 
 
 # =========================
@@ -149,6 +154,35 @@ def broadcast_system(text):
         for sock in clients:
             send_json(sock, message)
 
+def send_userlist(sock):
+    with lock:
+        users = sorted(usernames.keys())
+
+    send_json(sock, {
+        "type": MSG_USERLIST,
+        "users": users,
+        "ts": current_timestamp()
+    })
+
+
+def broadcast_userlist():
+    with lock:
+        users = sorted(usernames.keys())
+        sockets = list(clients.keys())
+
+    msg = {
+        "type": MSG_USERLIST,
+        "users": users,
+        "ts": current_timestamp()
+    }
+
+    for s in sockets:
+        try:
+            send_json(s, msg)
+        except Exception:
+            pass
+
+
 
 # =========================
 # History handling
@@ -190,6 +224,8 @@ def remove_client(client_socket):
 
     if username:
         broadcast_system(f"{username} left the chat")
+        broadcast_userlist()
+
 
     client_socket.close()
 
